@@ -1,15 +1,9 @@
 use crate::{
     image::Image,
-    pt::{gpt::GPT, mbr::MBR},
+    pt::{gpt::GPT, mbr::MBR, PartitionTableType},
 };
 
 use super::Action;
-
-pub enum PartitionTableType {
-    None,
-    MBR,
-    GPT,
-}
 
 pub struct InitActionArgs {
     pub pt_type: PartitionTableType,
@@ -26,7 +20,6 @@ pub struct InitAction {}
 impl Action<InitActionArgs, InitActionError> for InitAction {
     fn invoke(image: &mut Image, args: InitActionArgs) -> Result<(), InitActionError> {
         match args.pt_type {
-            PartitionTableType::None => Ok(()),
             PartitionTableType::MBR => {
                 let mbr = MBR::new();
                 mbr.write(image);

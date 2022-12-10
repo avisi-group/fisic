@@ -4,9 +4,11 @@ use fisic::{
     actions::Action,
     actions::{
         create::{invoke as InvokeCreate, CreateActionArgs},
-        init::{InitActionArgs, PartitionTableType},
+        init::InitActionArgs,
+        partitions::ListPartitionsArgs,
     },
     image::Image,
+    pt::PartitionTableType,
 };
 
 #[derive(Parser, Debug)]
@@ -33,7 +35,6 @@ struct CreateAction {
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
 enum InitType {
-    None,
     MBR,
     GPT,
 }
@@ -49,6 +50,14 @@ enum ActionCommand {
     Create(CreateAction),
     Init(InitAction),
     Info,
+    Partitions {
+        #[command(subcommand)]
+        action: PartitionsAction,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum PartitionsAction {
     List,
 }
 
@@ -59,9 +68,9 @@ impl TryFrom<CreateAction> for CreateActionArgs {
         Ok(CreateActionArgs {
             overwrite: value.overwrite,
             initial_pt_type: match value.init_pt {
-                Some(InitType::MBR) => PartitionTableType::MBR,
-                Some(InitType::GPT) => PartitionTableType::GPT,
-                _ => PartitionTableType::None,
+                Some(InitType::MBR) => Some(PartitionTableType::MBR),
+                Some(InitType::GPT) => Some(PartitionTableType::GPT),
+                _ => None,
             },
             size: parse_size::parse_size(value.size)
                 .map_err(|e| eyre!("size parsing failed: {}", e))?
@@ -76,7 +85,6 @@ impl TryFrom<InitAction> for InitActionArgs {
     fn try_from(value: InitAction) -> Result<Self, Self::Error> {
         Ok(InitActionArgs {
             pt_type: match value.init_type {
-                InitType::None => PartitionTableType::None,
                 InitType::MBR => PartitionTableType::MBR,
                 InitType::GPT => PartitionTableType::GPT,
             },
@@ -98,6 +106,12 @@ fn main() -> Result<()> {
                 ActionCommand::Init(a) => {
                     fisic::actions::init::InitAction::invoke(&mut image, a.try_into()?)?
                 }
+                ActionCommand::Partitions {
+                    action: PartitionsAction::List,
+                } => fisic::actions::partitions::ListPartitionsAction::invoke(
+                    &mut image,
+                    ListPartitionsArgs {},
+                )?,
                 _ => panic!("unsupported"),
             }
         }

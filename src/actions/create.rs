@@ -5,15 +5,13 @@ use nix::{
     sys::stat::Mode,
 };
 
-use crate::pt::gpt::GPT;
+use crate::pt::{gpt::GPT, PartitionTableType};
 use crate::{image::Image, pt::mbr::MBR};
-
-use super::init::PartitionTableType;
 
 pub struct CreateActionArgs {
     pub size: i64,
     pub overwrite: bool,
-    pub initial_pt_type: PartitionTableType,
+    pub initial_pt_type: Option<PartitionTableType>,
 }
 
 /// Error during creation of disk image.
@@ -66,13 +64,13 @@ pub fn invoke(image_file: &String, ca: CreateActionArgs) -> Result<(), CreateErr
     let mut image = Image::open(p).map_err(|_| CreateError::OpenError)?;
 
     match ca.initial_pt_type {
-        PartitionTableType::None => Ok(()),
-        PartitionTableType::MBR => {
+        None => Ok(()),
+        Some(PartitionTableType::MBR) => {
             let mbr = MBR::new();
             mbr.write(&mut image);
             Ok(())
         }
-        PartitionTableType::GPT => {
+        Some(PartitionTableType::GPT) => {
             let gpt = GPT::new();
             gpt.write(&mut image);
             Ok(())
