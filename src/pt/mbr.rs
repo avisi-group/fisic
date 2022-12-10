@@ -128,7 +128,7 @@ impl PartitionEntry {
         RawMBRPartitionEntry {
             status: match self.status {
                 EntryStatus::Bootable => 0x80,
-                EntryStatus::NotBootable => 0x00
+                EntryStatus::NotBootable => 0x00,
             },
             first_sector_chs: self.first_sector.to_bytes(),
             ptype: match self.ptype {

@@ -22,7 +22,7 @@ pub struct Image {
 
 impl Image {
     pub fn from_file(file: File) -> Result<Self, ImageError> {
-        let mut mem = unsafe { Mmap::map(&file).map_err(|_| ImageError::MapError)? }
+        let mem = unsafe { Mmap::map(&file).map_err(|_| ImageError::MapError)? }
             .make_mut()
             .map_err(|_| ImageError::MapError)?;
 
