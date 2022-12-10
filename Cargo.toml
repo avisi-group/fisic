@@ -1,0 +1,19 @@
+[package]
+name = "fisic"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+clap = { version = "4.0.23", features = ["derive"] }
+parse-size = "1.0.0"
+color-eyre = { version = "0.6.2", default-features = false }
+thiserror = "1.0.37"
+displaydoc = "0.2.3"
+nix = "0.25.0"
+uuid = { version = "1.2.2", features = ["v4"] }
+memmap = "0.7.0"
+num-traits = "0.2.15"
+num-derive = "0.3.3"
+crc-any = "2.4.3"
