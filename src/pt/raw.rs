@@ -55,6 +55,10 @@ impl RawGPTHeader {
     pub fn as_bytes(&self) -> &[u8] {
         unsafe { any_as_u8_slice(self) }
     }
+
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        unsafe { std::ptr::read(bytes.as_ptr() as *const _) }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -100,5 +104,9 @@ impl RawMBR {
 
     pub fn as_bytes(&self) -> &[u8] {
         unsafe { any_as_u8_slice(self) }
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        unsafe { std::ptr::read(bytes.as_ptr() as *const _) }
     }
 }

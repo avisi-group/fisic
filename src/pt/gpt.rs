@@ -1,7 +1,10 @@
+use super::{
+    mbr::PartitionType as MBRPartitionType,
+    raw::{RawGPTHeader, RawGPTPartitionEntry},
+};
 use crate::image::Image;
 use crate::pt::mbr::MBR;
 use uuid::{uuid, Uuid};
-use super::raw::{RawGPTHeader, RawGPTPartitionEntry};
 
 const BLOCK_SIZE: usize = 512;
 
@@ -143,5 +146,28 @@ impl GPT {
             alt_header_block - nr_entry_blocks,
             valid_range,
         );
+    }
+
+    pub fn read(image: &Image) -> Option<GPT> {
+        None
+    }
+
+    pub fn check(image: &Image) -> bool {
+        let mbr = MBR::read(image).unwrap();
+
+        match mbr.partition_table[0].ptype {
+            MBRPartitionType::ProtectiveMBR => {}
+            _ => {
+                return false;
+            }
+        }
+
+        let gpt = RawGPTHeader::from_bytes(image.get_blocks(1, 1));
+
+        if gpt.signature != [0x45, 0x46, 0x49, 0x20, 0x50, 0x41, 0x52, 0x54] {
+            return false;
+        }
+
+        true
     }
 }

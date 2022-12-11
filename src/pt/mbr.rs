@@ -20,6 +20,7 @@ pub enum EntryStatus {
 pub enum PartitionType {
     Empty,
     ProtectiveMBR,
+    Unknown,
 }
 
 pub struct CHS {
@@ -56,6 +57,14 @@ impl CHS {
         }
     }
 
+    pub fn from_raw(bytes: &[u8; 3]) -> Self {
+        CHS {
+            head: 0,
+            sector: 0,
+            cylinder: 0,
+        }
+    }
+
     fn saturate<T>(v: T, max: T) -> T
     where
         T: PartialOrd,
@@ -89,16 +98,16 @@ impl CHS {
 }
 
 pub struct PartitionEntry {
-    status: EntryStatus,
-    ptype: PartitionType,
-    first_sector: CHS,
-    last_sector: CHS,
-    first_sector_lba: usize,
-    nr_sectors: usize,
+    pub status: EntryStatus,
+    pub ptype: PartitionType,
+    pub first_sector: CHS,
+    pub last_sector: CHS,
+    pub first_sector_lba: usize,
+    pub nr_sectors: usize,
 }
 
 pub struct MBR {
-    partition_table: [PartitionEntry; 4],
+    pub partition_table: [PartitionEntry; 4],
 }
 
 impl PartitionEntry {
@@ -134,10 +143,30 @@ impl PartitionEntry {
             ptype: match self.ptype {
                 PartitionType::Empty => 0,
                 PartitionType::ProtectiveMBR => 0xee,
+                _ => 0xff,
             },
             last_sector_chs: self.last_sector.to_bytes(),
             first_sector_lba: self.first_sector_lba as u32,
             nr_sectors: self.nr_sectors as u32,
+        }
+    }
+
+    pub fn from_raw(raw: RawMBRPartitionEntry) -> PartitionEntry {
+        PartitionEntry {
+            status: if (raw.status & 0x80) == 0x80 {
+                EntryStatus::Bootable
+            } else {
+                EntryStatus::NotBootable
+            },
+            ptype: match raw.ptype {
+                0 => PartitionType::Empty,
+                0xee => PartitionType::ProtectiveMBR,
+                _ => PartitionType::Unknown,
+            },
+            first_sector: CHS::from_raw(&raw.first_sector_chs),
+            last_sector: CHS::from_raw(&raw.last_sector_chs),
+            first_sector_lba: raw.first_sector_lba as usize,
+            nr_sectors: raw.nr_sectors as usize,
         }
     }
 }
@@ -193,5 +222,30 @@ impl MBR {
         let block0 = image.get_blocks_mut(0, 1);
 
         block0.copy_from_slice(mbr.as_bytes());
+    }
+
+    pub fn read(image: &Image) -> Option<Self> {
+        let block0 = image.get_blocks(0, 1);
+        let raw = RawMBR::from_bytes(block0);
+
+        if raw.signature != [0x55, 0xaa] {
+            return None;
+        }
+
+        Some(MBR {
+            partition_table: [
+                PartitionEntry::from_raw(raw.partition_entries[0]),
+                PartitionEntry::from_raw(raw.partition_entries[1]),
+                PartitionEntry::from_raw(raw.partition_entries[2]),
+                PartitionEntry::from_raw(raw.partition_entries[3]),
+            ],
+        })
+    }
+
+    pub fn check(image: &Image) -> bool {
+        let block0 = image.get_blocks(0, 1);
+        let raw = RawMBR::from_bytes(block0);
+
+        raw.signature == [0x55, 0xaa]
     }
 }

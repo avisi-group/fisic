@@ -11,5 +11,13 @@ pub enum PartitionTableType {
 }
 
 pub fn determine_pt_type(image: &Image) -> Option<PartitionTableType> {
-    None
+    if mbr::MBR::check(image) {
+        if gpt::GPT::check(image) {
+            Some(PartitionTableType::GPT)
+        } else {
+            Some(PartitionTableType::MBR)
+        }
+    } else {
+        None
+    }
 }
