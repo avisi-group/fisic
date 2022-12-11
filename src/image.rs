@@ -17,6 +17,7 @@ pub enum ImageError {
 }
 
 pub struct Image {
+    block_size: usize,
     mem: MmapMut,
 }
 
@@ -26,7 +27,10 @@ impl Image {
             .make_mut()
             .map_err(|_| ImageError::MapError)?;
 
-        Ok(Image { mem })
+        Ok(Image {
+            block_size: BLOCK_SIZE,
+            mem,
+        })
     }
 
     pub fn open<P>(path: P) -> Result<Self, ImageError>
@@ -46,17 +50,25 @@ impl Image {
     }
 
     pub fn get_blocks(&self, block_index: usize, block_count: usize) -> &[u8] {
-        let block_start = block_index * BLOCK_SIZE;
-        let block_end = block_start + (block_count * BLOCK_SIZE);
+        let block_start = block_index * self.block_size;
+        let block_end = block_start + (block_count * self.block_size);
 
         &self.mem[block_start..block_end]
     }
 
     pub fn get_blocks_mut(&mut self, block_index: usize, block_count: usize) -> &mut [u8] {
-        let block_start = block_index * BLOCK_SIZE;
-        let block_end = block_start + (block_count * BLOCK_SIZE);
+        let block_start = block_index * self.block_size;
+        let block_end = block_start + (block_count * self.block_size);
 
         &mut self.mem[block_start..block_end]
+    }
+
+    pub fn read<T>(&self, offset: usize) -> T {
+        unsafe { std::ptr::read(self.mem[offset..].as_ptr() as *const _) }
+    }
+
+    pub fn write<T>(&mut self, offset: usize, obj: T) {
+        unsafe { std::ptr::write(self.mem[offset..].as_mut_ptr() as *mut _, obj) }
     }
 
     pub fn len(&self) -> usize {

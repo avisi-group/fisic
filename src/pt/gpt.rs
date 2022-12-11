@@ -103,15 +103,9 @@ impl GPT {
         hdr.partition_entries_lba = entries_start_idx as u64;
         hdr.nr_partition_entries = self.partitions.len() as u32;
         hdr.partition_entries_checksum = entries_checksum;
-        hdr.header_checksum = compute_crc32(hdr.as_bytes());
+        hdr.header_checksum = hdr.compute_checksum();
 
-        let block = image.get_blocks_mut(this_block_idx, 1);
-        block.fill(0);
-
-        block
-            .split_at_mut(std::mem::size_of::<RawGPTHeader>())
-            .0
-            .copy_from_slice(hdr.as_bytes());
+        image.write(this_block_idx * BLOCK_SIZE, hdr);
     }
 
     pub fn write(&self, image: &mut Image) {
@@ -156,18 +150,11 @@ impl GPT {
         let mbr = MBR::read(image).unwrap();
 
         match mbr.partition_table[0].ptype {
-            MBRPartitionType::ProtectiveMBR => {}
-            _ => {
-                return false;
+            MBRPartitionType::ProtectiveMBR => {
+                let gpt = image.read::<RawGPTHeader>(BLOCK_SIZE);
+                gpt.signature == [0x45, 0x46, 0x49, 0x20, 0x50, 0x41, 0x52, 0x54]
             }
+            _ => false,
         }
-
-        let gpt = RawGPTHeader::from_bytes(image.get_blocks(1, 1));
-
-        if gpt.signature != [0x45, 0x46, 0x49, 0x20, 0x50, 0x41, 0x52, 0x54] {
-            return false;
-        }
-
-        true
     }
 }

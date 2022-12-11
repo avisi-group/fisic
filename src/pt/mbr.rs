@@ -219,14 +219,11 @@ impl MBR {
 
     pub fn write(&self, image: &mut Image) {
         let mbr = self.to_raw();
-        let block0 = image.get_blocks_mut(0, 1);
-
-        block0.copy_from_slice(mbr.as_bytes());
+        image.write(0, mbr);
     }
 
     pub fn read(image: &Image) -> Option<Self> {
-        let block0 = image.get_blocks(0, 1);
-        let raw = RawMBR::from_bytes(block0);
+        let raw = image.read::<RawMBR>(0);
 
         if raw.signature != [0x55, 0xaa] {
             return None;
@@ -243,9 +240,7 @@ impl MBR {
     }
 
     pub fn check(image: &Image) -> bool {
-        let block0 = image.get_blocks(0, 1);
-        let raw = RawMBR::from_bytes(block0);
-
+        let raw = image.read::<RawMBR>(0);
         raw.signature == [0x55, 0xaa]
     }
 }

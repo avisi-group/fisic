@@ -1,7 +1,3 @@
-unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
-    ::std::slice::from_raw_parts((p as *const T) as *const u8, ::std::mem::size_of::<T>())
-}
-
 #[derive(Clone, Copy)]
 #[repr(C, packed)]
 pub struct RawGPTPartitionEntry {
@@ -52,12 +48,19 @@ impl RawGPTHeader {
         }
     }
 
-    pub fn as_bytes(&self) -> &[u8] {
-        unsafe { any_as_u8_slice(self) }
-    }
+    pub fn compute_checksum(&self) -> u32 {
+        let mut crc = crc_any::CRC::crc32();
 
-    pub fn from_bytes(bytes: &[u8]) -> Self {
-        unsafe { std::ptr::read(bytes.as_ptr() as *const _) }
+        let data = unsafe {
+            ::std::slice::from_raw_parts(
+                (self as *const _) as *const u8,
+                ::std::mem::size_of::<Self>(),
+            )
+        };
+
+        crc.digest(data);
+
+        crc.get_crc() as u32
     }
 }
 
@@ -100,13 +103,5 @@ impl RawMBR {
             partition_entries: [RawMBRPartitionEntry::new(); 4],
             signature: [0x55, 0xaa],
         }
-    }
-
-    pub fn as_bytes(&self) -> &[u8] {
-        unsafe { any_as_u8_slice(self) }
-    }
-
-    pub fn from_bytes(bytes: &[u8]) -> Self {
-        unsafe { std::ptr::read(bytes.as_ptr() as *const _) }
     }
 }
