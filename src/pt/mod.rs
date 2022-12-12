@@ -10,14 +10,24 @@ pub enum PartitionTableType {
     GPT,
 }
 
-pub fn determine_pt_type(image: &Image) -> Option<PartitionTableType> {
-    if mbr::MBR::check(image) {
-        if gpt::GPT::check(image) {
-            Some(PartitionTableType::GPT)
-        } else {
-            Some(PartitionTableType::MBR)
+#[derive(Debug)]
+pub enum PartitionTable {
+    MBR(mbr::MBR),
+    GPT(gpt::GPT),
+}
+
+pub fn read_partition_table(image: &Image) -> Option<PartitionTable> {
+    let mbr = mbr::MBR::read(image);
+
+    match mbr {
+        Some(mbr) => {
+            let gpt = gpt::GPT::read(image);
+
+            match gpt {
+                Some(gpt) => Some(PartitionTable::GPT(gpt)),
+                None => Some(PartitionTable::MBR(mbr)),
+            }
         }
-    } else {
-        None
+        None => None,
     }
 }

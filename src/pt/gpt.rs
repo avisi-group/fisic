@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use super::{
     mbr::PartitionType as MBRPartitionType,
     raw::{RawGPTHeader, RawGPTPartitionEntry},
@@ -15,7 +17,7 @@ fn compute_crc32(data: &[u8]) -> u32 {
     crc.get_crc() as u32
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Partition {
     partition_type: PartitionType,
 }
@@ -28,12 +30,13 @@ impl Partition {
     }
 }
 
+#[derive(Debug)]
 pub struct GPT {
     partitions: Vec<Partition>,
     disk_guid: Uuid,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum PartitionType {
     Unused,
     MBR,
@@ -143,18 +146,27 @@ impl GPT {
     }
 
     pub fn read(image: &Image) -> Option<GPT> {
-        None
-    }
-
-    pub fn check(image: &Image) -> bool {
         let mbr = MBR::read(image).unwrap();
 
         match mbr.partition_table[0].ptype {
             MBRPartitionType::ProtectiveMBR => {
                 let gpt = image.read::<RawGPTHeader>(BLOCK_SIZE);
-                gpt.signature == [0x45, 0x46, 0x49, 0x20, 0x50, 0x41, 0x52, 0x54]
+                if gpt.signature == [0x45, 0x46, 0x49, 0x20, 0x50, 0x41, 0x52, 0x54] {
+                    Some(GPT {
+                        partitions: vec![],
+                        disk_guid: Uuid::from_bytes(gpt.disk_guid),
+                    })
+                } else {
+                    None
+                }
             }
-            _ => false,
+            _ => None,
         }
+    }
+}
+
+impl Display for GPT {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("GUID: {}", self.disk_guid))
     }
 }

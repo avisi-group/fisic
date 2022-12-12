@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use super::raw::{RawMBR, RawMBRPartitionEntry};
 use crate::image::Image;
 
@@ -12,17 +14,20 @@ fn u32_to_le(v: u32) -> [u8; 4] {
     [v as u8, (v >> 8) as u8, (v >> 16) as u8, (v >> 24) as u8]
 }
 
+#[derive(Debug)]
 pub enum EntryStatus {
     Bootable,
     NotBootable,
 }
 
+#[derive(Debug, PartialEq)]
 pub enum PartitionType {
     Empty,
     ProtectiveMBR,
     Unknown,
 }
 
+#[derive(Debug)]
 pub struct CHS {
     head: usize,
     sector: usize,
@@ -97,6 +102,7 @@ impl CHS {
     }
 }
 
+#[derive(Debug)]
 pub struct PartitionEntry {
     pub status: EntryStatus,
     pub ptype: PartitionType,
@@ -106,6 +112,7 @@ pub struct PartitionEntry {
     pub nr_sectors: usize,
 }
 
+#[derive(Debug)]
 pub struct MBR {
     pub partition_table: [PartitionEntry; 4],
 }
@@ -168,6 +175,15 @@ impl PartitionEntry {
             first_sector_lba: raw.first_sector_lba as usize,
             nr_sectors: raw.nr_sectors as usize,
         }
+    }
+}
+
+impl Display for PartitionEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!(
+            "START={}, COUNT={}",
+            self.first_sector_lba, self.nr_sectors
+        ))
     }
 }
 
@@ -238,9 +254,16 @@ impl MBR {
             ],
         })
     }
+}
 
-    pub fn check(image: &Image) -> bool {
-        let raw = image.read::<RawMBR>(0);
-        raw.signature == [0x55, 0xaa]
+impl Display for MBR {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for pte in &self.partition_table {
+            if pte.ptype != PartitionType::Empty {
+                f.write_fmt(format_args!("{}", pte))?;
+            }
+        }
+
+        Ok(())
     }
 }

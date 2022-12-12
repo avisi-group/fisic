@@ -1,4 +1,4 @@
-use crate::pt::determine_pt_type;
+use crate::pt::{mbr::PartitionType, read_partition_table, PartitionTable};
 
 use super::Action;
 
@@ -18,8 +18,21 @@ impl Action<ListPartitionsArgs, ListPartitionsError> for ListPartitionsAction {
         args: ListPartitionsArgs,
     ) -> Result<(), ListPartitionsError> {
         // Determine partition table type
-        let pt_type = determine_pt_type(image);
-        dbg!("Found PT {}", pt_type);
+        let pt = read_partition_table(image);
+
+        match pt {
+            Some(PartitionTable::MBR(mbr)) => {
+                println!("found mbr:");
+                println!("{}", mbr);
+            }
+            Some(PartitionTable::GPT(gpt)) => {
+                println!("found gpt:");
+                println!("{}", gpt);
+            }
+            None => {
+                println!("no partition table found");
+            }
+        }
 
         Ok(())
     }
