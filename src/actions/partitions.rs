@@ -1,4 +1,4 @@
-use crate::pt::{mbr::PartitionType, read_partition_table, PartitionTable};
+use crate::pt::{read_partition_table, PartitionTable};
 
 use super::Action;
 

@@ -2,11 +2,14 @@ use std::fmt::Display;
 
 use super::{
     mbr::PartitionType as MBRPartitionType,
-    raw::{RawGPTHeader, RawGPTPartitionEntry},
+    raw::{
+        RawGPTHeader, RawGPTPartitionEntry, GPT_PTYPE_BIOS_BOOT, GPT_PTYPE_EFI_SYSTEM,
+        GPT_PTYPE_EMPTY, GPT_PTYPE_LINUX_FS, GPT_PTYPE_MBR,
+    },
 };
 use crate::image::Image;
 use crate::pt::mbr::MBR;
-use uuid::{uuid, Uuid};
+use nuuid::Uuid;
 
 const BLOCK_SIZE: usize = 512;
 
@@ -19,14 +22,39 @@ fn compute_crc32(data: &[u8]) -> u32 {
 
 #[derive(Clone, Debug)]
 pub struct Partition {
-    partition_type: PartitionType,
+    part_guid: Uuid,
+    type_guid: Uuid,
 }
 
 impl Partition {
-    pub fn new() -> Self {
+    pub fn new_empty() -> Self {
         Partition {
-            partition_type: PartitionType::Unused,
+            part_guid: Uuid::nil(),
+            type_guid: Uuid::parse(GPT_PTYPE_EMPTY).unwrap(),
         }
+    }
+
+    pub fn new(type_guid: Uuid) -> Self {
+        Partition {
+            part_guid: Uuid::new_v4(),
+            type_guid,
+        }
+    }
+
+    pub fn from_raw(pte: RawGPTPartitionEntry) -> Self {
+        Partition {
+            part_guid: Uuid::from_bytes_me(pte.ident),
+            type_guid: Uuid::from_bytes_me(pte.ptype),
+        }
+    }
+}
+
+impl Display for Partition {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!(
+            "ID:{}, Type: {}",
+            self.part_guid, self.type_guid
+        ))
     }
 }
 
@@ -36,37 +64,16 @@ pub struct GPT {
     disk_guid: Uuid,
 }
 
-#[derive(Clone, Debug)]
-pub enum PartitionType {
-    Unused,
-    MBR,
-    EFISystem,
-    BIOSBoot,
-    LinuxFilesystem,
-}
-
-impl From<PartitionType> for Uuid {
-    fn from(t: PartitionType) -> Self {
-        match t {
-            PartitionType::Unused => uuid! {"00000000-0000-0000-0000-000000000000"},
-            PartitionType::MBR => uuid! {"024DEE41-33E7-11D3-9D69-0008C781F39F"},
-            PartitionType::EFISystem => uuid! {"C12A7328-F81F-11D2-BA4B-00A0C93EC93B"},
-            PartitionType::BIOSBoot => uuid! {"21686148-6449-6E6F-744E-656564454649"},
-            PartitionType::LinuxFilesystem => uuid! {"0FC63DAF-8483-4772-8E79-3D69D8477DE4"},
-        }
-    }
-}
-
 impl GPT {
     pub fn new() -> Self {
         GPT {
-            partitions: vec![Partition::new(); 128],
+            partitions: vec![Partition::new_empty(); 128],
             disk_guid: Uuid::new_v4(),
         }
     }
 
-    pub fn add_partition(&mut self, t: PartitionType) -> () {
-        self.partitions.push(Partition { partition_type: t })
+    pub fn add_partition(&mut self, type_guid: Uuid) -> () {
+        self.partitions.push(Partition::new(type_guid));
     }
 
     fn write_protective_mbr(&self, image: &mut Image) {
@@ -102,7 +109,7 @@ impl GPT {
         hdr.other_header_lba = alternative_block_idx as u64;
         hdr.first_usable_lba = valid_range.0 as u64;
         hdr.last_usable_lba = valid_range.1 as u64;
-        hdr.disk_guid = self.disk_guid.to_bytes_le();
+        hdr.disk_guid = self.disk_guid.to_bytes_me();
         hdr.partition_entries_lba = entries_start_idx as u64;
         hdr.nr_partition_entries = self.partitions.len() as u32;
         hdr.partition_entries_checksum = entries_checksum;
@@ -145,6 +152,21 @@ impl GPT {
         );
     }
 
+    fn read_partitions(image: &Image, mut offset: usize, count: usize) -> Vec<Partition> {
+        let mut p = Vec::new();
+
+        for i in 0..count {
+            let pte: RawGPTPartitionEntry = image.read(offset);
+            if Uuid::from_bytes_me(pte.ptype).to_string().as_str() != GPT_PTYPE_EMPTY {
+                p.push(Partition::from_raw(pte));
+            }
+
+            offset += std::mem::size_of::<RawGPTPartitionEntry>();
+        }
+
+        p
+    }
+
     pub fn read(image: &Image) -> Option<GPT> {
         let mbr = MBR::read(image).unwrap();
 
@@ -153,7 +175,11 @@ impl GPT {
                 let gpt = image.read::<RawGPTHeader>(BLOCK_SIZE);
                 if gpt.signature == [0x45, 0x46, 0x49, 0x20, 0x50, 0x41, 0x52, 0x54] {
                     Some(GPT {
-                        partitions: vec![],
+                        partitions: Self::read_partitions(
+                            image,
+                            gpt.partition_entries_lba as usize * BLOCK_SIZE,
+                            gpt.nr_partition_entries as usize,
+                        ),
                         disk_guid: Uuid::from_bytes(gpt.disk_guid),
                     })
                 } else {
@@ -167,6 +193,12 @@ impl GPT {
 
 impl Display for GPT {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("GUID: {}", self.disk_guid))
+        f.write_fmt(format_args!("GUID: {}\n", self.disk_guid))?;
+
+        for pte in &self.partitions {
+            f.write_fmt(format_args!("{}\n", pte))?;
+        }
+
+        Ok(())
     }
 }

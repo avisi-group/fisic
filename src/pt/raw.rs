@@ -1,12 +1,18 @@
+pub const GPT_PTYPE_EMPTY: &str = "00000000-0000-0000-0000-000000000000";
+pub const GPT_PTYPE_MBR: &str = "024DEE41-33E7-11D3-9D69-0008C781F39F";
+pub const GPT_PTYPE_EFI_SYSTEM: &str = "C12A7328-F81F-11D2-BA4B-00A0C93EC93B";
+pub const GPT_PTYPE_BIOS_BOOT: &str = "21686148-6449-6E6F-744E-656564454649";
+pub const GPT_PTYPE_LINUX_FS: &str = "0FC63DAF-8483-4772-8E79-3D69D8477DE4";
+
 #[derive(Clone, Copy)]
 #[repr(C, packed)]
 pub struct RawGPTPartitionEntry {
-    ptype: [u8; 16],
-    ident: [u8; 16],
-    starting_lba: u64,
-    ending_lba: u64,
-    attributes: u64,
-    name: [u8; 72],
+    pub ptype: [u8; 16],
+    pub ident: [u8; 16],
+    pub starting_lba: u64,
+    pub ending_lba: u64,
+    pub attributes: u64,
+    pub name: [u8; 72],
 }
 
 #[derive(Clone, Copy)]
