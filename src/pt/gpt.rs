@@ -2,13 +2,11 @@ use std::fmt::Display;
 
 use super::{
     mbr::PartitionType as MBRPartitionType,
-    raw::{
-        RawGPTHeader, RawGPTPartitionEntry, GPT_PTYPE_BIOS_BOOT, GPT_PTYPE_EFI_SYSTEM,
-        GPT_PTYPE_EMPTY, GPT_PTYPE_LINUX_FS, GPT_PTYPE_MBR,
-    },
+    raw::{RawGPTHeader, RawGPTPartitionEntry, GPT_PTYPE_EMPTY},
 };
 use crate::image::Image;
 use crate::pt::mbr::MBR;
+use humansize::BINARY;
 use nuuid::Uuid;
 
 const BLOCK_SIZE: usize = 512;
@@ -24,6 +22,9 @@ fn compute_crc32(data: &[u8]) -> u32 {
 pub struct Partition {
     part_guid: Uuid,
     type_guid: Uuid,
+    name: String,
+    start: usize,
+    end: usize,
 }
 
 impl Partition {
@@ -31,13 +32,19 @@ impl Partition {
         Partition {
             part_guid: Uuid::nil(),
             type_guid: Uuid::parse(GPT_PTYPE_EMPTY).unwrap(),
+            name: String::from(""),
+            start: 0,
+            end: 0,
         }
     }
 
-    pub fn new(type_guid: Uuid) -> Self {
+    pub fn new(type_guid: Uuid, name: String, start: usize, end: usize) -> Self {
         Partition {
             part_guid: Uuid::new_v4(),
             type_guid,
+            name,
+            start,
+            end,
         }
     }
 
@@ -45,15 +52,30 @@ impl Partition {
         Partition {
             part_guid: Uuid::from_bytes_me(pte.ident),
             type_guid: Uuid::from_bytes_me(pte.ptype),
+            name: String::from_utf8(pte.name.to_vec()).unwrap(),
+            start: pte.starting_lba as usize,
+            end: pte.ending_lba as usize,
         }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.type_guid == Uuid::parse(GPT_PTYPE_EMPTY).unwrap()
     }
 }
 
 impl Display for Partition {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let bytes = (self.end - self.start + 1) * BLOCK_SIZE;
+
         f.write_fmt(format_args!(
-            "ID:{}, Type: {}",
-            self.part_guid, self.type_guid
+            "ID: {}, Type: {}, Name: {}, Start: {}, End: {}, Sectors: {}, Size: {}",
+            self.part_guid,
+            self.type_guid,
+            self.name,
+            self.start,
+            self.end,
+            self.end - self.start + 1,
+            humansize::format_size(bytes, BINARY)
         ))
     }
 }
@@ -72,8 +94,9 @@ impl GPT {
         }
     }
 
-    pub fn add_partition(&mut self, type_guid: Uuid) -> () {
-        self.partitions.push(Partition::new(type_guid));
+    pub fn add_partition(&mut self, type_guid: Uuid, name: String, start: usize, end: usize) -> () {
+        self.partitions
+            .push(Partition::new(type_guid, name, start, end));
     }
 
     fn write_protective_mbr(&self, image: &mut Image) {
@@ -157,9 +180,7 @@ impl GPT {
 
         for i in 0..count {
             let pte: RawGPTPartitionEntry = image.read(offset);
-            if Uuid::from_bytes_me(pte.ptype).to_string().as_str() != GPT_PTYPE_EMPTY {
-                p.push(Partition::from_raw(pte));
-            }
+            p.push(Partition::from_raw(pte));
 
             offset += std::mem::size_of::<RawGPTPartitionEntry>();
         }
@@ -196,7 +217,9 @@ impl Display for GPT {
         f.write_fmt(format_args!("GUID: {}\n", self.disk_guid))?;
 
         for pte in &self.partitions {
-            f.write_fmt(format_args!("{}\n", pte))?;
+            if !pte.is_empty() {
+                f.write_fmt(format_args!("{}\n", pte))?;
+            }
         }
 
         Ok(())

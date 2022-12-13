@@ -199,6 +199,7 @@ dependencies = [
  "color-eyre",
  "crc-any",
  "displaydoc",
+ "humansize",
  "memmap",
  "nix",
  "num-derive",
@@ -251,6 +252,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "humansize"
+version = "2.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4e682e2bd70ecbcce5209f11a992a4ba001fea8e60acf7860ce007629e6d2756"
+dependencies = [
+ "libm",
+]
+
+[[package]]
 name = "indenter"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -261,6 +271,12 @@ name = "libc"
 version = "0.2.137"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc7fcc620a3bff7cdd7a365be3376c97191aeaccc2a603e600951e452615bf89"
+
+[[package]]
+name = "libm"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "348108ab3fba42ec82ff6e9564fc4ca0247bdccdc68dd8af9764bbc79c3c8ffb"
 
 [[package]]
 name = "md-5"
